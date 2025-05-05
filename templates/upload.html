@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Загрузить изображение для подсчёта овец</h2>
+
+<input type="file" id="fileInput" accept="image/*"><br><br>
+<canvas id="canvas" style="border:1px solid #000;"></canvas><br><br>
+<button id="processBtn" disabled>Обработать</button>
+
+<h3>Результат:</h3>
+<div id="result"></div>
+
+<script>
+    const fileInput = document.getElementById('fileInput');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const processBtn = document.getElementById('processBtn');
+    const resultDiv = document.getElementById('result');
+    let img = new Image();
+
+    fileInput.addEventListener('change', e => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            img.onload = function() {
+                canvas.width = img.width;
+                canvas.height = img.height;
+                ctx.drawImage(img, 0, 0);
+                processBtn.disabled = false;
+                resultDiv.innerHTML = '';
+            }
+            img.src = event.target.result;
+        }
+        reader.readAsDataURL(file);
+    });
+
+    processBtn.addEventListener('click', () => {
+        const dataURL = canvas.toDataURL('image/png');
+        processBtn.disabled = true;
+        resultDiv.innerHTML = 'Обработка...';
+
+        fetch('/process_image', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({image: dataURL})
+        })
+        .then(response => response.json())
+        .then(data => {
+            processBtn.disabled = false;
+            resultDiv.innerHTML = `
+                <p>Обнаружено овец: <b>${data.sheep_count}</b></p>
+                <img src="${data.image_url}" style="max-width:600px; max-height:400px; width:auto; height:auto; border:1px solid #ccc;">
+            `;
+        })
+        .catch(err => {
+            processBtn.disabled = false;
+            resultDiv.innerHTML = 'Ошибка при обработке изображения.';
+            console.error(err);
+        });
+    });
+</script>
+{% endblock %}
